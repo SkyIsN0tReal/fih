@@ -1,1 +1,525 @@
 <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Interface Test</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #fbfbfb;
+            --bg-tertiary: #f2f2f2;
+            --bg-beige: #f5f3ec;
+            --text-primary: #000000;
+            --text-secondary: #696969;
+            --text-muted: #7a7a7a;
+            --text-extra: #ababab;
+            --text-bright: #ffffff;
+            --border-subtle: #f0f0f0;
+            --border-grid: #f5f5f5;
+            --accent: #4a90e2;
+            --accent-hover: #3a7bc8;
+            --accent-light: #e3f2fd;
+            --button-bg: #f6f6f6;
+            --button-hover: #ececec;
+            --null-bg: rgba(214, 212, 206, 0.3);
+            --sidebar-bg: #fbfbfb;
+            --icon-muted: #ababab;
+            --red-text: #e57373;
+            --other-color-a: #d6d4ce;
+            --other-color-b: #f7f6f3;
+        }
+
+        body {
+            font-family: 'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            height: 100vh;
+            width: 100vw;
+            font-size: 14px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            display: flex;
+            flex-direction: column;
+            box-shadow: none;
+        }
+
+        .sidebar-layout {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            padding: 32px 16px 120px 16px;
+            overflow-y: auto;
+            background: transparent;
+            scrollbar-width: none;
+            position: relative;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .sidebar-content::-webkit-scrollbar {
+            display: none;
+        }
+
+        .welcome-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -60%);
+            text-align: center;
+            z-index: 1;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        .welcome-container.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .welcome-gif {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 12px;
+            opacity: 0.8;
+        }
+
+        .welcome-text {
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .chat-messages {
+            max-height: none;
+            overflow-y: visible;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            padding: 0;
+        }
+
+        .chat-message {
+            font-size: 13px;
+            line-height: 1.4;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            text-align: left;
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .chat-message.assistant {
+            align-self: stretch;
+            padding-left: 0;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            padding: 0;
+        }
+
+        .chat-message.user {
+            align-self: flex-start;
+            display: inline-block;
+            width: fit-content;
+            max-width: 85%;
+            background: var(--button-bg);
+            border: none;
+            border-radius: 6px;
+            padding: 10px 12px;
+            position: relative;
+        }
+
+        .chat-undo-icon {
+            width: 16px;
+            height: 16px;
+            position: absolute;
+            right: -24px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            filter: brightness(0) saturate(100%) invert(38%) sepia(7%) saturate(356%) hue-rotate(343deg) brightness(93%) contrast(88%);
+        }
+
+        .chat-message.user:hover .chat-undo-icon {
+            opacity: 1;
+        }
+
+        .sidebar-footer {
+            padding: 24px 16px;
+            border-top: none;
+            display: flex;
+            background: transparent;
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 600px;
+            z-index: 100;
+        }
+
+        .chat-input-row {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            padding: 12px;
+            background: var(--bg-primary);
+            transition: border-color 0.15s ease, box-shadow 0.2s ease;
+            position: relative;
+            min-height: 56px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.01);
+            cursor: text;
+        }
+
+        .chat-input-row:focus-within {
+            border-color: var(--text-primary);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .chat-input {
+            flex: 1;
+            border: none;
+            border-radius: 4px;
+            padding: 12px 36px 12px 12px;
+            font-size: 13px;
+            background: transparent;
+            color: var(--text-primary);
+            resize: none;
+            overflow: hidden;
+            font-family: inherit;
+            min-height: 52px;
+            position: relative;
+            z-index: 10;
+            cursor: text;
+        }
+
+        .chat-input::placeholder {
+            color: var(--text-secondary);
+            font-family: inherit;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            box-shadow: none;
+        }
+
+        .chat-send-btn {
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 50%;
+            background: var(--text-primary);
+            color: var(--text-bright);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            right: 14px;
+            bottom: 12px;
+            transition: background 0.2s ease;
+            z-index: 3;
+            box-shadow: 0 1px 2px rgba(255, 255, 255, 0.08);
+            padding: 0;
+            line-height: 0;
+        }
+
+        .chat-send-icon {
+            width: 12px;
+            height: 12px;
+            filter: brightness(0) saturate(100%) invert(100%);
+        }
+
+        .chat-send-btn:hover {
+            background: var(--text-secondary);
+        }
+
+
+        .top-container {
+            background: var(--text-primary);
+            border: 1px solid var(--text-primary);
+            border-radius: 999px;
+            padding: 6px 12px;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%) translateY(-8px);
+            width: fit-content;
+            min-width: 0;
+            min-height: 24px;
+            z-index: 2;
+            opacity: 0;
+            display: none;
+            align-items: center;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.03);
+        }
+
+        .top-container.show {
+            display: inline-flex;
+            animation: fadeInUp 0.4s ease forwards;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .thinking-content {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            white-space: nowrap;
+            min-height: 24px;
+        }
+
+        .top-container.show .thinking-content {
+            opacity: 1;
+        }
+
+        .fade-text {
+            display: inline-flex;
+            gap: 0;
+            letter-spacing: 0;
+            font-size: 12px;
+            line-height: 24px;
+            color: var(--text-bright);
+        }
+
+        .fade-text span {
+            display: inline-block;
+            margin: 0;
+            opacity: 0;
+            animation: fadeOnly 1.5s ease-in-out infinite;
+        }
+
+        .fade-text span:nth-child(1) { animation-delay: 0s; }
+        .fade-text span:nth-child(2) { animation-delay: 0.05s; }
+        .fade-text span:nth-child(3) { animation-delay: 0.1s; }
+        .fade-text span:nth-child(4) { animation-delay: 0.15s; }
+        .fade-text span:nth-child(5) { animation-delay: 0.2s; }
+        .fade-text span:nth-child(6) { animation-delay: 0.25s; }
+        .fade-text span:nth-child(7) { animation-delay: 0.3s; }
+        .fade-text span:nth-child(8) { animation-delay: 0.35s; }
+        .fade-text span:nth-child(9) { animation-delay: 0.4s; }
+        .fade-text span:nth-child(10) { animation-delay: 0.45s; }
+        .fade-text span:nth-child(11) { animation-delay: 0.5s; }
+
+        @keyframes fadeOnly {
+            0% { opacity: 0; }
+            30% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+
+        /* Send icon placeholder */
+        .send-icon {
+            width: 14px;
+            height: 14px;
+            color: var(--text-bright);
+        }
+
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div class="sidebar-layout">
+            <div class="sidebar-content">
+                <div class="welcome-container" id="welcomeContainer">
+                    <p class="welcome-text">Ask fih anything</p>
+                </div>
+                <div id="chatMessages" class="chat-messages"></div>
+            </div>
+            <div class="sidebar-footer">
+                <div class="chat-input-row" id="chatInputRow">
+                    <div class="top-container" id="chatTopContainer">
+                        <div class="thinking-content" id="chatThinkingContent">
+                            <div class="fade-text" id="chatThinkingText">
+                                <span>T</span><span>h</span><span>i</span><span>n</span><span>k</span><span>i</span><span>n</span><span>g</span><span>.</span><span>.</span><span>.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <textarea id="chatInput" class="chat-input" placeholder="Ask fih..." rows="1"></textarea>
+                    <button id="chatSendBtn" class="chat-send-btn">
+                        <svg class="send-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M13.0001 7.82843V20H11.0001V7.82843L5.63614 13.1924L4.22192 11.7782L12.0001 4L19.7783 11.7782L18.3641 13.1924L13.0001 7.82843Z"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Chat functionality
+        const chatInput = document.getElementById('chatInput');
+        const chatSendBtn = document.getElementById('chatSendBtn');
+        const chatMessages = document.getElementById('chatMessages');
+        const welcomeContainer = document.getElementById('welcomeContainer');
+        const topContainer = document.getElementById('chatTopContainer');
+        const thinkingContent = document.getElementById('chatThinkingContent');
+        const chatInputRow = document.getElementById('chatInputRow');
+
+        let isGeneratingResponse = false;
+
+        // Auto-resize textarea
+        function autoResize() {
+            chatInput.style.height = 'auto';
+            chatInput.style.height = chatInput.scrollHeight + 'px';
+        }
+
+        // Initialize with padding
+        chatInput.style.paddingTop = '6px';
+        autoResize();
+        chatInput.addEventListener('input', autoResize);
+
+        // Click on chat row focuses input
+        chatInputRow.addEventListener('click', (e) => {
+            if (e.target === chatInputRow || e.target.classList.contains('chat-input-row')) {
+                chatInput.focus();
+            }
+        });
+
+        // Send message function
+        function sendMessage() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+
+            // Hide welcome container if exists
+            if (welcomeContainer) {
+                welcomeContainer.classList.add('hidden');
+            }
+
+            // Add user message
+            const userMessage = document.createElement('div');
+            userMessage.className = 'chat-message user';
+            userMessage.innerHTML = `
+                <span>${text}</span>
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3C/svg%3E" alt="undo" class="chat-undo-icon">
+            `;
+            chatMessages.appendChild(userMessage);
+
+            // Clear input
+            chatInput.value = '';
+            autoResize();
+
+            // Set generating mode (disable button while processing)
+            isGeneratingResponse = true;
+            chatSendBtn.disabled = true;
+            chatSendBtn.style.opacity = '0.2';
+            chatSendBtn.style.cursor = 'not-allowed';
+            chatSendBtn.style.background = 'var(--null-bg)';
+            chatSendBtn.style.pointerEvents = 'none';
+
+            // Show thinking animation
+            topContainer.classList.add('show');
+            thinkingContent.style.display = 'flex';
+
+            // Simulate response after delay
+            setTimeout(() => {
+                // Add assistant message
+                const assistantMessage = document.createElement('div');
+                assistantMessage.className = 'chat-message assistant';
+                assistantMessage.textContent = `I'm fih, your AI assistant. In the future, I'll provide intelligent responses to help you with your tasks. For now, this is a placeholder response acknowledging your message: "${text}"`;
+                chatMessages.appendChild(assistantMessage);
+
+                // Hide thinking animation
+                topContainer.classList.remove('show');
+                thinkingContent.style.display = 'flex';
+
+                // Reset button (re-enable for next message)
+                isGeneratingResponse = false;
+                chatSendBtn.disabled = false;
+                chatSendBtn.style.opacity = '1';
+                chatSendBtn.style.cursor = 'pointer';
+                chatSendBtn.style.background = 'var(--text-primary)';
+                chatSendBtn.style.pointerEvents = 'auto';
+            }, 2000);
+
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Send button click handler
+        chatSendBtn.addEventListener('click', () => {
+            if (!isGeneratingResponse) {
+                sendMessage();
+            }
+        });
+
+        // Enter key handler
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!isGeneratingResponse) {
+                    sendMessage();
+                }
+            }
+        });
+
+
+        // Add some example messages
+        function addExampleMessages() {
+            const examples = [
+                { role: 'user', text: 'Hello, how can you help me?' },
+                { role: 'assistant', text: 'I can help you process and analyze CSV data. You can ask me to clean data, handle missing values, or perform various data transformations.' }
+            ];
+
+            examples.forEach(msg => {
+                const message = document.createElement('div');
+                message.className = `chat-message ${msg.role}`;
+                if (msg.role === 'user') {
+                    message.innerHTML = `
+                        <span>${msg.text}</span>
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3C/svg%3E" alt="undo" class="chat-undo-icon">
+                    `;
+                } else {
+                    message.textContent = msg.text;
+                }
+                chatMessages.appendChild(message);
+            });
+
+            // Hide welcome container if there are messages
+            if (welcomeContainer) {
+                welcomeContainer.classList.add('hidden');
+            }
+        }
+
+        // Uncomment to add example messages on load
+        // addExampleMessages();
+    </script>
+</body>
+</html>
