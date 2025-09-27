@@ -171,6 +171,10 @@
             padding: 0;
         }
 
+        :root[data-theme="dark"] .chat-message.assistant .large-token {
+            color: var(--red-text);
+        }
+
         .chat-message.user {
             align-self: flex-end;
             display: inline-block;
@@ -205,6 +209,8 @@
             padding: 24px 16px;
             border-top: none;
             display: flex;
+            flex-direction: column;
+            gap: 12px;
             background: transparent;
             position: fixed;
             bottom: 0;
@@ -213,6 +219,35 @@
             width: 100%;
             max-width: 600px;
             z-index: 100;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: var(--bg-primary);
+            border-radius: 14px;
+            padding: 10px 14px;
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.01);
+        }
+
+        .slider-row label {
+            white-space: nowrap;
+        }
+
+        .slider-row input[type="range"] {
+            flex: 1;
+            accent-color: var(--accent);
+        }
+
+        .slider-value {
+            min-width: 3ch;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-primary);
         }
 
         .chat-input-row {
@@ -291,6 +326,38 @@
         .chat-send-btn:not(:disabled) {
             pointer-events: auto;
             cursor: pointer;
+        }
+
+        .clear-history-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            border: none;
+            border-radius: 16px;
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 500;
+            background: var(--button-bg);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: background 0.2s ease, opacity 0.2s ease;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .clear-history-btn:hover {
+            background: var(--button-hover);
+        }
+
+        .chat-send-btn.is-stop {
+            border-radius: 8px;
+            background: var(--red-text);
+            color: var(--text-bright);
+        }
+
+        .chat-send-btn svg {
+            width: 14px;
+            height: 14px;
         }
 
 
@@ -414,6 +481,7 @@
     </style>
 </head>
 <body>
+    <button id="clearHistoryBtn" class="clear-history-btn" type="button">Clear history</button>
     <!-- Theme Toggle Button -->
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
         <svg class="theme-icon sun-icon" id="sunIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -447,6 +515,11 @@
                 </div>
             </div>
             <div class="sidebar-footer">
+                <div class="slider-row">
+                    <label for="perplexitySlider">Perplexity threshold</label>
+                    <input id="perplexitySlider" type="range" min="1" max="20" step="0.5" value="5">
+                    <span id="perplexityValue" class="slider-value">5.0</span>
+                </div>
                 <div class="chat-input-row" id="chatInputRow">
                     <textarea id="chatInput" class="chat-input" placeholder="Ask fih..." rows="1"></textarea>
                     <button id="chatSendBtn" class="chat-send-btn">
@@ -495,8 +568,17 @@
         const welcomeContainer = document.getElementById('welcomeContainer');
         const thinkingIndicator = document.getElementById('thinkingIndicator');
         const chatInputRow = document.getElementById('chatInputRow');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+        const perplexitySlider = document.getElementById('perplexitySlider');
+        const perplexityValue = document.getElementById('perplexityValue');
+        const SEND_ICON_SVG = '<svg class="send-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M13.0001 7.82843V20H11.0001V7.82843L5.63614 13.1924L4.22192 11.7782L12.0001 4L19.7783 11.7782L18.3641 13.1924L13.0001 7.82843Z"></path></svg>';
+        const STOP_ICON_SVG = '<svg class="send-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"></rect></svg>';
 
         let isGeneratingResponse = false;
+        let conversationId = localStorage.getItem('conversationId');
+        let activeController = null;
+        let abortRequested = false;
+        let hasReceivedFirstChunk = false;
 
         // Auto-resize textarea
         function autoResize() {
@@ -509,6 +591,72 @@
         autoResize();
         chatInput.addEventListener('input', autoResize);
 
+        function updatePerplexityDisplay(value) {
+            if (!perplexityValue) return;
+            const numeric = Number.parseFloat(value);
+            perplexityValue.textContent = Number.isFinite(numeric) ? numeric.toFixed(1) : '—';
+        }
+
+        if (perplexitySlider) {
+            const savedThreshold = localStorage.getItem('perplexityThreshold');
+            const initialValue = savedThreshold !== null ? savedThreshold : perplexitySlider.value;
+            perplexitySlider.value = initialValue;
+            updatePerplexityDisplay(perplexitySlider.value);
+
+            perplexitySlider.addEventListener('input', (event) => {
+                const { value } = event.target;
+                updatePerplexityDisplay(value);
+                localStorage.setItem('perplexityThreshold', value);
+            });
+        }
+
+        function getPerplexityThreshold() {
+            if (!perplexitySlider) return undefined;
+            const value = Number.parseFloat(perplexitySlider.value);
+            return Number.isFinite(value) ? value : undefined;
+        }
+
+        function showThinking() {
+            if (thinkingIndicator) {
+                thinkingIndicator.classList.add('show');
+            }
+        }
+
+        function hideThinking() {
+            if (thinkingIndicator) {
+                thinkingIndicator.classList.remove('show');
+            }
+        }
+
+        function setGeneratingState(active) {
+            isGeneratingResponse = active;
+            if (!chatSendBtn) return;
+            chatSendBtn.disabled = false;
+            chatSendBtn.style.opacity = '';
+            chatSendBtn.style.cursor = '';
+            chatSendBtn.style.background = '';
+            chatSendBtn.style.pointerEvents = '';
+
+            if (active) {
+                chatSendBtn.innerHTML = STOP_ICON_SVG;
+                chatSendBtn.classList.add('is-stop');
+                chatSendBtn.setAttribute('aria-label', 'Stop streaming');
+                chatSendBtn.setAttribute('title', 'Stop streaming');
+            } else {
+                chatSendBtn.innerHTML = SEND_ICON_SVG;
+                chatSendBtn.classList.remove('is-stop');
+                chatSendBtn.setAttribute('aria-label', 'Send message');
+                chatSendBtn.setAttribute('title', 'Send message');
+            }
+        }
+
+        function stopStreaming() {
+            if (!isGeneratingResponse || !activeController) return;
+            abortRequested = true;
+            chatSendBtn.disabled = true;
+            activeController.abort();
+        }
+
         // Click on chat row focuses input
         chatInputRow.addEventListener('click', (e) => {
             if (e.target === chatInputRow || e.target.classList.contains('chat-input-row')) {
@@ -517,9 +665,12 @@
         });
 
         // Send message function
-        function sendMessage() {
+        async function sendMessage() {
             const text = chatInput.value.trim();
             if (!text) return;
+
+            abortRequested = false;
+            hasReceivedFirstChunk = false;
 
             // Hide welcome container if exists
             if (welcomeContainer) {
@@ -534,59 +685,176 @@
                 <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3C/svg%3E" alt="undo" class="chat-undo-icon">
             `;
             chatMessages.appendChild(userMessage);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
 
             // Clear input
             chatInput.value = '';
             autoResize();
 
-            // Set generating mode (disable button while processing)
-            isGeneratingResponse = true;
-            chatSendBtn.disabled = true;
-            chatSendBtn.style.opacity = '0.2';
-            chatSendBtn.style.cursor = 'not-allowed';
-            chatSendBtn.style.background = 'var(--null-bg)';
-            chatSendBtn.style.pointerEvents = 'none';
+            setGeneratingState(true);
+            showThinking();
 
-            // Show thinking animation
-            thinkingIndicator.classList.add('show');
+            const assistantMessage = document.createElement('div');
+            assistantMessage.className = 'chat-message assistant';
+            assistantMessage.textContent = '';
+            assistantMessage.dataset.rawText = '';
+            chatMessages.appendChild(assistantMessage);
 
-            // Simulate response after delay
-            setTimeout(() => {
-                // Add assistant message
-                const assistantMessage = document.createElement('div');
-                assistantMessage.className = 'chat-message assistant';
-                assistantMessage.textContent = `I'm fih, your AI assistant. In the future, I'll provide intelligent responses to help you with your tasks. For now, this is a placeholder response acknowledging your message: "${text}"`;
-                chatMessages.appendChild(assistantMessage);
+            let reader;
+            const decoder = new TextDecoder();
+            let buffer = '';
+            const controller = new AbortController();
+            activeController = controller;
 
-                // Hide thinking animation
-                thinkingIndicator.classList.remove('show');
+            const appendAssistantChunk = (chunk, fromLarge) => {
+                if (!chunk) return;
+                if (!hasReceivedFirstChunk) {
+                    hasReceivedFirstChunk = true;
+                    hideThinking();
+                }
+                assistantMessage.dataset.rawText = (assistantMessage.dataset.rawText || '') + chunk;
+                if (fromLarge) {
+                    const span = document.createElement('span');
+                    span.className = 'large-token';
+                    span.textContent = chunk;
+                    assistantMessage.appendChild(span);
+                } else {
+                    assistantMessage.appendChild(document.createTextNode(chunk));
+                }
+            };
 
-                // Reset button (re-enable for next message)
-                isGeneratingResponse = false;
-                chatSendBtn.disabled = false;
-                chatSendBtn.style.opacity = '1';
-                chatSendBtn.style.cursor = 'pointer';
-                chatSendBtn.style.background = 'var(--text-primary)';
-                chatSendBtn.style.pointerEvents = 'auto';
-            }, 2000);
+            try {
+                const payload = {
+                    message: text,
+                    conversation_id: conversationId
+                };
+                const threshold = getPerplexityThreshold();
+                if (threshold !== undefined) {
+                    payload.perplexity_threshold = threshold;
+                }
 
-            // Scroll to bottom
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server returned ${response.status}`);
+                }
+
+                if (!response.body) {
+                    throw new Error('Streaming not supported in this browser.');
+                }
+
+                reader = response.body.getReader();
+                let done = false;
+
+                while (!done) {
+                    const result = await reader.read();
+                    if (result.done) {
+                        done = true;
+                        buffer += decoder.decode();
+                    } else {
+                        buffer += decoder.decode(result.value, { stream: true });
+                    }
+
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        let payload;
+                        try {
+                            payload = JSON.parse(line);
+                        } catch (parseError) {
+                            console.error('Failed to parse stream chunk', parseError, line);
+                            continue;
+                        }
+
+                        if (payload.conversation_id) {
+                            conversationId = payload.conversation_id;
+                            localStorage.setItem('conversationId', conversationId);
+                        }
+
+                        if (payload.error) {
+                            throw new Error(payload.error);
+                        }
+
+                        if (payload.delta) {
+                            appendAssistantChunk(payload.delta, Boolean(payload.from_large));
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }
+
+                        if (payload.done) {
+                            if (payload.response) {
+                                assistantMessage.dataset.rawText = payload.response;
+                            }
+                            done = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (buffer.trim()) {
+                    try {
+                        const payload = JSON.parse(buffer.trim());
+                        if (payload.conversation_id) {
+                            conversationId = payload.conversation_id;
+                            localStorage.setItem('conversationId', conversationId);
+                        }
+                        if (payload.error) {
+                            throw new Error(payload.error);
+                        }
+                        if (payload.delta) {
+                            appendAssistantChunk(payload.delta, Boolean(payload.from_large));
+                        }
+                        if (payload.done) {
+                            if (payload.response) {
+                                assistantMessage.dataset.rawText = payload.response;
+                            }
+                        }
+                    } catch (parseError) {
+                        console.error('Failed to parse trailing stream chunk', parseError, buffer);
+                    }
+                }
+            } catch (error) {
+                if (abortRequested || error.name === 'AbortError') {
+                    console.info('Streaming aborted');
+                } else {
+                    console.error('Chat error', error);
+                    assistantMessage.textContent = `Sorry, something went wrong: ${error.message}`;
+                    assistantMessage.dataset.rawText = assistantMessage.textContent;
+                }
+            } finally {
+                if (reader) {
+                    try { reader.releaseLock(); } catch (e) { /* noop */ }
+                }
+                hideThinking();
+                setGeneratingState(false);
+                activeController = null;
+                abortRequested = false;
+                hasReceivedFirstChunk = false;
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
         }
 
         // Send button click handler
-        chatSendBtn.addEventListener('click', () => {
-            if (!isGeneratingResponse) {
-                sendMessage();
+        chatSendBtn.addEventListener('click', async () => {
+            if (isGeneratingResponse) {
+                stopStreaming();
+            } else {
+                await sendMessage();
             }
         });
 
         // Enter key handler
-        chatInput.addEventListener('keydown', (e) => {
+        chatInput.addEventListener('keydown', async (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 if (!isGeneratingResponse) {
-                    sendMessage();
+                    await sendMessage();
                 }
             }
         });
@@ -618,6 +886,37 @@
                 welcomeContainer.classList.add('hidden');
             }
         }
+
+        if (clearHistoryBtn) {
+            clearHistoryBtn.addEventListener('click', async () => {
+                if (isGeneratingResponse && activeController) {
+                    abortRequested = true;
+                    activeController.abort();
+                }
+
+                const previousConversation = conversationId;
+                conversationId = null;
+                localStorage.removeItem('conversationId');
+
+                chatMessages.innerHTML = '';
+                if (welcomeContainer) {
+                    welcomeContainer.classList.remove('hidden');
+                }
+
+                hideThinking();
+
+                if (previousConversation) {
+                    try {
+                        const endpoint = `/api/conversations/${encodeURIComponent(previousConversation)}`;
+                        await fetch(endpoint, { method: 'DELETE' });
+                    } catch (err) {
+                        console.warn('Failed to clear conversation', err);
+                    }
+                }
+            });
+        }
+
+        setGeneratingState(false);
 
         // Uncomment to add example messages on load
         // addExampleMessages();
