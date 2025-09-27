@@ -277,20 +277,20 @@
             right: 14px;
             bottom: 12px;
             transition: background 0.2s ease;
-            z-index: 3;
+            z-index: 1000;
             box-shadow: 0 1px 2px rgba(255, 255, 255, 0.08);
             padding: 0;
             line-height: 0;
         }
 
-        .chat-send-icon {
-            width: 12px;
-            height: 12px;
-            filter: brightness(0) saturate(100%) invert(100%);
-        }
 
         .chat-send-btn:hover {
             background: var(--text-secondary);
+        }
+
+        .chat-send-btn:not(:disabled) {
+            pointer-events: auto;
+            cursor: pointer;
         }
 
 
@@ -403,12 +403,12 @@
         }
 
         /* Ensure send icon changes color in light mode */
-        :root[data-theme="light"] .chat-send-icon {
-            filter: brightness(0) saturate(100%) invert(0%);
+        :root[data-theme="light"] .send-icon {
+            filter: brightness(0) saturate(100%) invert(100%);
         }
 
-        :root[data-theme="dark"] .chat-send-icon {
-            filter: brightness(0) saturate(100%) invert(100%);
+        :root[data-theme="dark"] .send-icon {
+            filter: brightness(0) saturate(100%) invert(0%);
         }
 
     </style>
