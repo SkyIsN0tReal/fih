@@ -37,6 +37,18 @@ STOP_TOKENS = {"<|im_end|>", "</s>", "<|endoftext|>", "<|eot_id|>"}
 SMALL_CHAT_FORMAT = os.environ.get("SMALL_CHAT_FORMAT", "llama-3")
 LARGE_CHAT_FORMAT = os.environ.get("LARGE_CHAT_FORMAT", "qwen")
 MAX_SEARCH_RESULTS = 2
+MAX_IMAGE_GALLERY_ITEMS = 8
+LOGO_KEYWORDS = {
+    "logo",
+    "favicon",
+    "icon",
+    "badge",
+    "sprite",
+    "watermark",
+    "wordmark",
+    "brandmark",
+    "monogram",
+}
 
 CHAT_FORMATTERS = {
     "llama-3": llama_chat_format.format_llama3,
@@ -301,8 +313,89 @@ def _normalize_whitespace(text: str) -> str:
     return " ".join(text.split())
 
 
-def _extract_search_results(raw: Any) -> List[Dict[str, str]]:
-    results: List[Dict[str, str]] = []
+def _first_string(values: List[Any]) -> str:
+    for value in values:
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped:
+                return stripped
+    return ""
+
+
+def _coerce_url_list(value: Any) -> List[str]:
+    if not value:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    urls: List[str] = []
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            if isinstance(item, str):
+                stripped = item.strip()
+                if stripped:
+                    urls.append(stripped)
+    return urls
+
+
+def _dedupe_preserve_order(items: List[str]) -> List[str]:
+    seen: Set[str] = set()
+    ordered: List[str] = []
+    for item in items:
+        if item and item not in seen:
+            seen.add(item)
+            ordered.append(item)
+    return ordered
+
+
+def _looks_like_logo(url: str) -> bool:
+    lowered = url.lower()
+    if any(keyword in lowered for keyword in LOGO_KEYWORDS):
+        return True
+    tail = lowered.rsplit("/", 1)[-1]
+    if any(keyword in tail for keyword in LOGO_KEYWORDS):
+        return True
+    return False
+
+
+def _gather_nested_field(obj: Any, field: str) -> List[Any]:
+    values: List[Any] = []
+    values.append(_field_from_object(obj, field))
+
+    extras = _field_from_object(obj, "extras")
+    if extras is not None:
+        values.append(_field_from_object(extras, field))
+
+    contents = _field_from_object(obj, "contents")
+    if contents is not None:
+        values.append(_field_from_object(contents, field))
+        nested_extras = _field_from_object(contents, "extras")
+        if nested_extras is not None:
+            values.append(_field_from_object(nested_extras, field))
+
+    return [value for value in values if value is not None]
+
+
+def _extract_image_links_from_item(item: Any) -> List[str]:
+    links: List[str] = []
+    for candidate in _gather_nested_field(item, "imageLinks"):
+        links.extend(_coerce_url_list(candidate))
+    for candidate in _gather_nested_field(item, "image_links"):
+        links.extend(_coerce_url_list(candidate))
+    return _dedupe_preserve_order(links)
+
+
+def _extract_primary_image(item: Any) -> str:
+    candidates = _gather_nested_field(item, "image") + _gather_nested_field(item, "primary_image")
+    return _first_string(candidates)
+
+
+def _extract_favicon(item: Any) -> str:
+    candidates = _gather_nested_field(item, "favicon")
+    return _first_string(candidates)
+
+
+def _extract_search_results(raw: Any) -> List[Dict[str, Any]]:
+    results: List[Dict[str, Any]] = []
     if raw is None:
         return results
 
@@ -325,16 +418,57 @@ def _extract_search_results(raw: Any) -> List[Dict[str, str]]:
         snippet = _normalize_whitespace(_coerce_str(snippet_source))
         if len(snippet) > 500:
             snippet = snippet[:497].rstrip() + "..."
+        image_url = _extract_primary_image(item)
+        image_links = _extract_image_links_from_item(item)
+        favicon = _extract_favicon(item)
+
         results.append({
             "title": _coerce_str(title) or "Untitled result",
             "url": url,
             "snippet": snippet,
+            "image": image_url,
+            "image_links": image_links,
+            "favicon": favicon,
         })
 
     return results
 
 
-def _build_search_context(results: List[Dict[str, str]]) -> str:
+def _collect_gallery_images(results: List[Dict[str, Any]]) -> List[str]:
+    seen: Set[str] = set()
+    gallery: List[str] = []
+    
+    def add_url(url: Any) -> bool:
+        if not isinstance(url, str):
+            return False
+        stripped = url.strip()
+        if not stripped or stripped in seen:
+            return False
+        if _looks_like_logo(stripped):
+            return False
+        seen.add(stripped)
+        gallery.append(stripped)
+        return len(gallery) >= MAX_IMAGE_GALLERY_ITEMS
+
+    def add_urls(urls: Any) -> bool:
+        if isinstance(urls, (list, tuple, set)):
+            for url in urls:
+                if add_url(url):
+                    return True
+        return False
+
+    for item in results:
+        if add_urls(item.get("image_links")):
+            return gallery
+
+    for item in results:
+        if add_url(item.get("image")):
+            return gallery
+
+    return gallery
+
+
+def _build_search_context(results: List[Dict[str, Any]]) -> str:
     if not results:
         return ""
 
@@ -484,20 +618,26 @@ def chat() -> Response:
         history = conversations[conversation_id]
         buffered_response = ""
         use_search = bool(data.get("use_search"))
-        search_results_payload: List[Dict[str, str]] = []
+        search_results_payload: List[Dict[str, Any]] = []
         search_error: Optional[str] = None
         search_context_text: Optional[str] = None
+        search_image_gallery: List[str] = []
+        include_images = False
 
         if use_search:
             try:
-                raw_search = exa_search(message)
+                include_images = "image" in message.lower()
+                raw_search = exa_search(message, include_images=include_images)
                 search_results_payload = _extract_search_results(raw_search)
+                if include_images:
+                    search_image_gallery = _collect_gallery_images(search_results_payload)
                 search_context_text = _build_search_context(search_results_payload)
             except Exception:  # pragma: no cover - network dependency
                 app.logger.exception("Exa search failed")
                 search_error = "Web search failed; continuing without external context."
                 search_results_payload = []
                 search_context_text = None
+                search_image_gallery = []
 
         try:
             with generation_lock:
@@ -532,7 +672,10 @@ def chat() -> Response:
                         "conversation_id": conversation_id,
                         "event": "search_results",
                         "results": search_results_payload,
+                        "include_images": include_images,
                     }
+                    if search_image_gallery:
+                        payload["images"] = search_image_gallery
                     if search_error:
                         payload["error"] = search_error
                     yield json.dumps(payload) + "\n"
