@@ -96,17 +96,41 @@
         .sidebar-content {
             flex: 1;
             padding: 32px 16px 120px 16px;
-            overflow-y: auto;
+            overflow: hidden;
             background: transparent;
-            scrollbar-width: none;
             position: relative;
             max-width: 800px;
             margin: 0 auto;
             width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
 
-        .sidebar-content::-webkit-scrollbar {
+        .chat-messages-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+            padding-right: 6px;
+            scrollbar-gutter: stable both-edges;
+            position: relative;
+        }
+
+        .chat-messages-wrapper {
+            scrollbar-width: none;
+        }
+
+        .chat-messages-wrapper::-webkit-scrollbar {
             display: none;
+        }
+
+        .chat-bottom-spacer {
+            flex-shrink: 0;
+            height: 0;
+            pointer-events: none;
+            transition: height 0.2s ease;
         }
 
         .welcome-container {
@@ -139,14 +163,13 @@
         }
 
         .chat-messages {
-            max-height: none;
-            overflow-y: visible;
             background: transparent;
             border: none;
             border-radius: 0;
             padding: 0;
             display: flex;
             flex-direction: column;
+            gap: 12px;
         }
 
         .chat-message {
@@ -169,6 +192,54 @@
             border: none;
             border-radius: 0;
             padding: 0;
+        }
+
+        .chat-message.search-results-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 12px 14px;
+        }
+
+        .search-results-heading {
+            font-size: 12px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .search-results-list {
+            margin: 0;
+            padding-left: 20px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .search-results-item a {
+            color: #4a90e2;
+            text-decoration: underline;
+            font-weight: 500;
+        }
+
+        :root[data-theme="dark"] .search-results-item a {
+            color: #7cb2ff;
+        }
+
+        .search-results-snippet {
+            margin-top: 4px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .search-results-error {
+            color: var(--red-text);
+            font-size: 12px;
+        }
+
+        .search-results-empty {
+            color: var(--text-secondary);
+            font-size: 12px;
         }
 
         :root[data-theme="dark"] .chat-message.assistant .large-token {
@@ -234,6 +305,11 @@
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.01);
         }
 
+        .slider-row.disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
         .slider-row label {
             white-space: nowrap;
         }
@@ -243,11 +319,40 @@
             accent-color: var(--accent);
         }
 
+        .slider-row.disabled .slider-value {
+            color: var(--text-secondary);
+        }
+
         .slider-value {
             min-width: 3ch;
             text-align: right;
             font-variant-numeric: tabular-nums;
             color: var(--text-primary);
+        }
+
+        .toggle-btn {
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 10px 14px;
+            font-size: 12px;
+            font-weight: 500;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toggle-btn:hover {
+            background: var(--button-hover);
+        }
+
+        .toggle-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--text-bright);
         }
 
         .chat-input-row {
@@ -366,9 +471,11 @@
             font-size: 13px;
             line-height: 1.4;
             margin-bottom: 12px;
+            margin-top: auto;
             display: none;
             opacity: 0;
             transition: opacity 0.3s ease;
+            padding-bottom: 8px;
         }
 
         .thinking-indicator.show {
@@ -505,13 +612,16 @@
                 <div class="welcome-container" id="welcomeContainer">
                     <p class="welcome-text">Ask fih anything</p>
                 </div>
-                <div id="chatMessages" class="chat-messages"></div>
-                <div class="thinking-indicator" id="thinkingIndicator">
-                    <div class="thinking-content">
-                        <div class="fade-text" id="thinkingText">
-                            <span>T</span><span>h</span><span>i</span><span>n</span><span>k</span><span>i</span><span>n</span><span>g</span><span>.</span><span>.</span><span>.</span>
+                <div id="chatMessagesWrapper" class="chat-messages-wrapper">
+                    <div id="chatMessages" class="chat-messages"></div>
+                    <div class="thinking-indicator" id="thinkingIndicator">
+                        <div class="thinking-content">
+                            <div class="fade-text" id="thinkingText">
+                                <span>T</span><span>h</span><span>i</span><span>n</span><span>k</span><span>i</span><span>n</span><span>g</span><span>.</span><span>.</span><span>.</span>
+                            </div>
                         </div>
                     </div>
+                    <div id="chatBottomSpacer" class="chat-bottom-spacer" aria-hidden="true"></div>
                 </div>
             </div>
             <div class="sidebar-footer">
@@ -520,6 +630,8 @@
                     <input id="perplexitySlider" type="range" min="1" max="20" step="0.5" value="5">
                     <span id="perplexityValue" class="slider-value">5.0</span>
                 </div>
+                <button id="searchToggleBtn" class="toggle-btn" type="button" aria-pressed="false">Web search off</button>
+                <button id="forceLargeBtn" class="toggle-btn" type="button" aria-pressed="false">Always use qwen3 4b</button>
                 <div class="chat-input-row" id="chatInputRow">
                     <textarea id="chatInput" class="chat-input" placeholder="Ask fih..." rows="1"></textarea>
                     <button id="chatSendBtn" class="chat-send-btn">
@@ -565,20 +677,144 @@
         const chatInput = document.getElementById('chatInput');
         const chatSendBtn = document.getElementById('chatSendBtn');
         const chatMessages = document.getElementById('chatMessages');
+        const chatMessagesWrapper = document.getElementById('chatMessagesWrapper');
+        const bottomSpacer = document.getElementById('chatBottomSpacer');
         const welcomeContainer = document.getElementById('welcomeContainer');
         const thinkingIndicator = document.getElementById('thinkingIndicator');
         const chatInputRow = document.getElementById('chatInputRow');
         const clearHistoryBtn = document.getElementById('clearHistoryBtn');
         const perplexitySlider = document.getElementById('perplexitySlider');
         const perplexityValue = document.getElementById('perplexityValue');
+        const forceLargeBtn = document.getElementById('forceLargeBtn');
+        const searchToggleBtn = document.getElementById('searchToggleBtn');
+        const sliderRow = document.querySelector('.slider-row');
         const SEND_ICON_SVG = '<svg class="send-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M13.0001 7.82843V20H11.0001V7.82843L5.63614 13.1924L4.22192 11.7782L12.0001 4L19.7783 11.7782L18.3641 13.1924L13.0001 7.82843Z"></path></svg>';
         const STOP_ICON_SVG = '<svg class="send-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"></rect></svg>';
+        const ALWAYS_USE_LARGE_KEY = 'alwaysUseLargeModel';
+        const USE_SEARCH_KEY = 'useSearchEnabled';
+        const BOTTOM_BUFFER_PX = 320;
+        const TOP_ANCHOR_OFFSET_PX = 24;
+        const NEAR_BOTTOM_THRESHOLD_PX = 120;
 
         let isGeneratingResponse = false;
         let conversationId = localStorage.getItem('conversationId');
         let activeController = null;
         let abortRequested = false;
         let hasReceivedFirstChunk = false;
+        let alwaysUseLargeModel = localStorage.getItem(ALWAYS_USE_LARGE_KEY) === 'true';
+        let useSearch = localStorage.getItem(USE_SEARCH_KEY) === 'true';
+
+        function getBottomSpacerHeight() {
+            return bottomSpacer ? bottomSpacer.offsetHeight : 0;
+        }
+
+        function isNearBottom() {
+            if (!chatMessagesWrapper) return true;
+            const { scrollTop, clientHeight, scrollHeight } = chatMessagesWrapper;
+            const remaining = (scrollHeight - clientHeight) - scrollTop;
+            return remaining <= (NEAR_BOTTOM_THRESHOLD_PX + BOTTOM_BUFFER_PX);
+        }
+
+        function updateBottomSpacer() {
+            if (!chatMessagesWrapper || !bottomSpacer) return 0;
+            const currentHeight = getBottomSpacerHeight();
+            const contentHeight = chatMessagesWrapper.scrollHeight - currentHeight;
+            const overflow = contentHeight > chatMessagesWrapper.clientHeight + 1;
+            const targetHeight = overflow ? BOTTOM_BUFFER_PX : 0;
+            if (currentHeight !== targetHeight) {
+                bottomSpacer.style.height = `${targetHeight}px`;
+            }
+            return targetHeight;
+        }
+
+        function scrollToLatest({ force = false, smooth = true, element = null, offset = TOP_ANCHOR_OFFSET_PX } = {}) {
+            if (!chatMessagesWrapper) return;
+            updateBottomSpacer();
+
+            const targetElement = element || chatMessages?.lastElementChild || thinkingIndicator || bottomSpacer;
+            if (!targetElement) return;
+
+            const behavior = smooth ? 'smooth' : 'auto';
+            const isBottomTarget = targetElement === bottomSpacer || targetElement === thinkingIndicator || targetElement === chatMessages?.lastElementChild;
+
+            if (force && isBottomTarget) {
+                requestAnimationFrame(() => {
+                    chatMessagesWrapper.scrollTo({ top: chatMessagesWrapper.scrollHeight, behavior });
+                });
+                return;
+            }
+
+            if (!force && !isNearBottom()) return;
+
+            requestAnimationFrame(() => {
+                const wrapperRect = chatMessagesWrapper.getBoundingClientRect();
+                const elementRect = targetElement.getBoundingClientRect();
+                const deltaTop = elementRect.top - (wrapperRect.top + offset);
+                const deltaBottom = elementRect.bottom - (wrapperRect.bottom - BOTTOM_BUFFER_PX);
+
+                let delta = 0;
+                if (force) {
+                    delta = Math.abs(deltaBottom) > Math.abs(deltaTop) ? deltaBottom : deltaTop;
+                } else if (deltaTop < 0) {
+                    delta = deltaTop;
+                } else if (deltaBottom > 0) {
+                    delta = deltaBottom;
+                } else {
+                    return;
+                }
+
+                if (delta !== 0) {
+                    chatMessagesWrapper.scrollBy({ top: delta, behavior });
+                }
+            });
+        }
+
+        function updateForceLargeButton() {
+            if (!forceLargeBtn) return;
+            if (alwaysUseLargeModel) {
+                forceLargeBtn.classList.add('active');
+            } else {
+                forceLargeBtn.classList.remove('active');
+            }
+            forceLargeBtn.setAttribute('aria-pressed', alwaysUseLargeModel ? 'true' : 'false');
+            if (perplexitySlider) {
+                perplexitySlider.disabled = alwaysUseLargeModel;
+            }
+            if (sliderRow) {
+                sliderRow.classList.toggle('disabled', alwaysUseLargeModel);
+            }
+        }
+
+        function updateSearchToggleButton() {
+            if (!searchToggleBtn) return;
+            if (useSearch) {
+                searchToggleBtn.classList.add('active');
+                searchToggleBtn.textContent = 'Web search on';
+            } else {
+                searchToggleBtn.classList.remove('active');
+                searchToggleBtn.textContent = 'Web search off';
+            }
+            searchToggleBtn.setAttribute('aria-pressed', useSearch ? 'true' : 'false');
+        }
+
+        updateForceLargeButton();
+        updateSearchToggleButton();
+
+        if (forceLargeBtn) {
+            forceLargeBtn.addEventListener('click', () => {
+                alwaysUseLargeModel = !alwaysUseLargeModel;
+                localStorage.setItem(ALWAYS_USE_LARGE_KEY, String(alwaysUseLargeModel));
+                updateForceLargeButton();
+            });
+        }
+
+        if (searchToggleBtn) {
+            searchToggleBtn.addEventListener('click', () => {
+                useSearch = !useSearch;
+                localStorage.setItem(USE_SEARCH_KEY, String(useSearch));
+                updateSearchToggleButton();
+            });
+        }
 
         // Auto-resize textarea
         function autoResize() {
@@ -616,16 +852,22 @@
             return Number.isFinite(value) ? value : undefined;
         }
 
+        function getAlwaysUseLarge() {
+            return Boolean(alwaysUseLargeModel);
+        }
+
         function showThinking() {
             if (thinkingIndicator) {
                 thinkingIndicator.classList.add('show');
             }
+            scrollToLatest({ element: thinkingIndicator, force: true });
         }
 
         function hideThinking() {
             if (thinkingIndicator) {
                 thinkingIndicator.classList.remove('show');
             }
+            updateBottomSpacer();
         }
 
         function setGeneratingState(active) {
@@ -685,7 +927,7 @@
                 <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3C/svg%3E" alt="undo" class="chat-undo-icon">
             `;
             chatMessages.appendChild(userMessage);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            scrollToLatest({ element: userMessage, force: true, smooth: true });
 
             // Clear input
             chatInput.value = '';
@@ -699,6 +941,73 @@
             assistantMessage.textContent = '';
             assistantMessage.dataset.rawText = '';
             chatMessages.appendChild(assistantMessage);
+            scrollToLatest({ element: assistantMessage, force: true, smooth: true });
+
+            let searchResultsElement = null;
+
+            const renderSearchResults = (payload) => {
+                if (!payload) return;
+                const resultsArray = Array.isArray(payload.results) ? payload.results.filter((item) => item && item.url) : [];
+                const topResults = resultsArray.slice(0, 2);
+                const errorText = typeof payload.error === 'string' ? payload.error : '';
+
+                if (!topResults.length && !errorText) {
+                    return;
+                }
+
+                if (!searchResultsElement) {
+                    searchResultsElement = document.createElement('div');
+                }
+                searchResultsElement.className = 'chat-message assistant search-results-card';
+                searchResultsElement.innerHTML = '';
+
+                const heading = document.createElement('div');
+                heading.className = 'search-results-heading';
+                heading.textContent = 'Web search';
+                searchResultsElement.appendChild(heading);
+
+                if (topResults.length) {
+                    const list = document.createElement('ol');
+                    list.className = 'search-results-list';
+                    topResults.forEach((item) => {
+                        const li = document.createElement('li');
+                        li.className = 'search-results-item';
+                        const link = document.createElement('a');
+                        link.href = item.url;
+                        link.textContent = item.title || item.url;
+                        link.target = '_blank';
+                        link.rel = 'noopener noreferrer';
+                        li.appendChild(link);
+                        if (item.snippet) {
+                            const snippet = document.createElement('div');
+                            snippet.className = 'search-results-snippet';
+                            snippet.textContent = item.snippet;
+                            li.appendChild(snippet);
+                        }
+                        list.appendChild(li);
+                    });
+                    searchResultsElement.appendChild(list);
+                } else {
+                    const empty = document.createElement('div');
+                    empty.className = 'search-results-empty';
+                    empty.textContent = 'No web results were found for this query.';
+                    searchResultsElement.appendChild(empty);
+                }
+
+                if (errorText) {
+                    const error = document.createElement('div');
+                    error.className = 'search-results-error';
+                    error.textContent = errorText;
+                    searchResultsElement.appendChild(error);
+                }
+
+                if (assistantMessage.parentNode) {
+                    chatMessages.insertBefore(searchResultsElement, assistantMessage);
+                } else {
+                    chatMessages.appendChild(searchResultsElement);
+                }
+                scrollToLatest({ element: searchResultsElement, smooth: true, force: true });
+            };
 
             let reader;
             const decoder = new TextDecoder();
@@ -721,15 +1030,18 @@
                 } else {
                     assistantMessage.appendChild(document.createTextNode(chunk));
                 }
+                scrollToLatest({ element: assistantMessage, smooth: true, force: false });
             };
 
             try {
                 const payload = {
                     message: text,
-                    conversation_id: conversationId
+                    conversation_id: conversationId,
+                    always_use_large_model: getAlwaysUseLarge(),
+                    use_search: useSearch,
                 };
                 const threshold = getPerplexityThreshold();
-                if (threshold !== undefined) {
+                if (!payload.always_use_large_model && threshold !== undefined) {
                     payload.perplexity_threshold = threshold;
                 }
 
@@ -778,13 +1090,17 @@
                             localStorage.setItem('conversationId', conversationId);
                         }
 
+                        if (payload.event === 'search_results') {
+                            renderSearchResults(payload);
+                            continue;
+                        }
+
                         if (payload.error) {
                             throw new Error(payload.error);
                         }
 
                         if (payload.delta) {
                             appendAssistantChunk(payload.delta, Boolean(payload.from_large));
-                            chatMessages.scrollTop = chatMessages.scrollHeight;
                         }
 
                         if (payload.done) {
@@ -804,7 +1120,9 @@
                             conversationId = payload.conversation_id;
                             localStorage.setItem('conversationId', conversationId);
                         }
-                        if (payload.error) {
+                        if (payload.event === 'search_results') {
+                            renderSearchResults(payload);
+                        } else if (payload.error) {
                             throw new Error(payload.error);
                         }
                         if (payload.delta) {
@@ -836,7 +1154,7 @@
                 activeController = null;
                 abortRequested = false;
                 hasReceivedFirstChunk = false;
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+                scrollToLatest({ element: assistantMessage, force: true, smooth: true });
             }
         }
 
@@ -899,11 +1217,15 @@
                 localStorage.removeItem('conversationId');
 
                 chatMessages.innerHTML = '';
+                if (chatMessagesWrapper) {
+                    chatMessagesWrapper.scrollTop = 0;
+                }
                 if (welcomeContainer) {
                     welcomeContainer.classList.remove('hidden');
                 }
 
                 hideThinking();
+                updateBottomSpacer();
 
                 if (previousConversation) {
                     try {
@@ -917,6 +1239,7 @@
         }
 
         setGeneratingState(false);
+        updateBottomSpacer();
 
         // Uncomment to add example messages on load
         // addExampleMessages();
