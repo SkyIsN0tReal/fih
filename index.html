@@ -27,6 +27,10 @@
         --accent: #4a90e2;       /* keep brand color */
         --accent-hover: #3a7bc8;
         --accent-light: #1a2b3c; /* muted version for dark bg */
+        --tag-bg: rgba(74, 144, 226, 0.18);
+        --tag-text: #96c2ff;
+        --tag-hover-bg: #4a90e2;
+        --tag-hover-text: #ffffff;
         --button-bg: #2d2d2d;
         --button-hover: #3a3a3a;
         --null-bg: rgba(80, 80, 80, 0.3);
@@ -53,6 +57,10 @@
         --accent: #4a90e2;
         --accent-hover: #3a7bc8;
         --accent-light: #e3f2fd;
+        --tag-bg: rgba(74, 144, 226, 0.12);
+        --tag-text: #2463a5;
+        --tag-hover-bg: #4a90e2;
+        --tag-hover-text: #ffffff;
         --button-bg: #f6f6f6;
         --button-hover: #ececec;
         --null-bg: rgba(214, 212, 206, 0.3);
@@ -218,7 +226,6 @@
 
         .search-results-item a {
             color: #4a90e2;
-            text-decoration: underline;
             font-weight: 500;
         }
 
@@ -240,6 +247,20 @@
         .search-results-empty {
             color: var(--text-secondary);
             font-size: 12px;
+        }
+
+        .search-images-grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        }
+
+        .search-images-grid img {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            border-radius: 10px;
+            border: none;
         }
 
         .chat-message.assistant .large-token {
@@ -769,8 +790,7 @@
         const BOTTOM_BUFFER_PX = 320;
         const TOP_ANCHOR_OFFSET_PX = 24;
         const NEAR_BOTTOM_THRESHOLD_PX = 120;
-        const LARGE_MARKER_START = '[[LG_START]]';
-        const LARGE_MARKER_END = '[[LG_END]]';
+        // Removed large marker constants
 
         let isGeneratingResponse = false;
         let conversationId = localStorage.getItem('conversationId');
@@ -915,6 +935,10 @@
             }
         }
 
+        function autoLinkify() {}
+
+        function enhanceAssistantLinks() {}
+
         function renderAssistantMessageWithFormatting(element) {
             if (!element) return;
             const renderSource = element.dataset.renderText || element.dataset.rawText || '';
@@ -923,21 +947,17 @@
                 return;
             }
 
-            if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
-                const fallback = renderSource
-                    .replaceAll(LARGE_MARKER_START, '')
-                    .replaceAll(LARGE_MARKER_END, '')
-                    .replaceAll('\n', '<br>');
-                element.innerHTML = fallback;
-                return;
-            }
+        if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+            const fallback = renderSource.replaceAll('\n', '<br>');
+            element.innerHTML = fallback;
+            return;
+        }
 
-            const parsed = marked.parse(renderSource, { breaks: true, gfm: true });
-            const withHighlights = parsed
-                .replaceAll(LARGE_MARKER_START, '<span class="large-token">')
-                .replaceAll(LARGE_MARKER_END, '</span>');
-            const sanitized = DOMPurify.sanitize(withHighlights, { USE_PROFILES: { html: true } });
-            element.innerHTML = sanitized;
+        const parsed = marked.parse(renderSource, { breaks: true, gfm: true });
+        const sanitized = DOMPurify.sanitize(parsed, { USE_PROFILES: { html: true } });
+        element.innerHTML = sanitized;
+        autoLinkify(element);
+        enhanceAssistantLinks(element);
         }
 
         function getBottomSpacerHeight() {
@@ -1218,6 +1238,7 @@
             scrollToLatest({ element: assistantMessage, force: true, smooth: true });
 
             let searchResultsElement = null;
+            let imageResultsElement = null;
 
             const renderSearchResults = (payload) => {
                 if (!payload) return;
@@ -1280,7 +1301,74 @@
                 } else {
                     chatMessages.appendChild(searchResultsElement);
                 }
-                scrollToLatest({ element: searchResultsElement, smooth: true, force: true });
+
+                const MAX_IMAGES = 8;
+                const shouldIncludeImages = Boolean(payload.include_images);
+                const images = shouldIncludeImages ? (() => {
+                    const urls = [];
+                    const seen = new Set();
+                    const add = (value) => {
+                        if (typeof value !== 'string') return;
+                        const trimmed = value.trim();
+                        if (!trimmed || seen.has(trimmed)) return;
+                        seen.add(trimmed);
+                        urls.push(trimmed);
+                    };
+                    const addMany = (values) => {
+                        if (!Array.isArray(values)) return;
+                        values.forEach(add);
+                    };
+
+                    if (Array.isArray(payload.images)) {
+                        payload.images.forEach(add);
+                    }
+
+                    if (!urls.length && resultsArray.length) {
+                        resultsArray.forEach((item) => {
+                            if (!item) return;
+                            add(item.image);
+                            addMany(item.image_links);
+                        });
+                    }
+
+                    return urls.slice(0, MAX_IMAGES);
+                })() : [];
+
+                if (images.length) {
+                    if (!imageResultsElement) {
+                        imageResultsElement = document.createElement('div');
+                    }
+                    imageResultsElement.className = 'chat-message assistant search-images-wrapper';
+                    imageResultsElement.innerHTML = '';
+
+                    const grid = document.createElement('div');
+                    grid.className = 'search-images-grid';
+images.forEach((url) => {
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'Result image';
+    img.loading = 'lazy';
+                        img.onerror = function() {
+                            this.remove();
+                        };
+    grid.appendChild(img);
+});
+                    imageResultsElement.appendChild(grid);
+
+                    if (assistantMessage.parentNode) {
+                        chatMessages.insertBefore(imageResultsElement, assistantMessage);
+                    } else {
+                        chatMessages.appendChild(imageResultsElement);
+                    }
+                } else if (imageResultsElement && imageResultsElement.parentNode) {
+                    imageResultsElement.parentNode.removeChild(imageResultsElement);
+                    imageResultsElement = null;
+                }
+
+                const scrollTarget = imageResultsElement || searchResultsElement;
+                if (scrollTarget) {
+                    scrollToLatest({ element: scrollTarget, smooth: true, force: true });
+                }
             };
 
             let reader;
@@ -1289,19 +1377,19 @@
             const controller = new AbortController();
             activeController = controller;
 
-            const appendAssistantChunk = (chunk, fromLarge) => {
-                if (!chunk) return;
-                if (!hasReceivedFirstChunk) {
-                    hasReceivedFirstChunk = true;
-                    hideThinking();
-                }
-                const currentRaw = assistantMessage.dataset.rawText || '';
-                const currentRender = assistantMessage.dataset.renderText || '';
-                assistantMessage.dataset.rawText = currentRaw + chunk;
-                assistantMessage.dataset.renderText = currentRender + (fromLarge ? `${LARGE_MARKER_START}${chunk}${LARGE_MARKER_END}` : chunk);
-                renderAssistantMessageWithFormatting(assistantMessage);
-                scrollToLatest({ element: assistantMessage, smooth: true, force: false });
-            };
+        const appendAssistantChunk = (chunk, fromLarge) => {
+            if (!chunk) return;
+            if (!hasReceivedFirstChunk) {
+                hasReceivedFirstChunk = true;
+                hideThinking();
+            }
+            const currentRaw = assistantMessage.dataset.rawText || '';
+            const currentRender = assistantMessage.dataset.renderText || '';
+            assistantMessage.dataset.rawText = currentRaw + chunk;
+            assistantMessage.dataset.renderText = currentRender + chunk;
+            renderAssistantMessageWithFormatting(assistantMessage);
+            scrollToLatest({ element: assistantMessage, smooth: true, force: false });
+        };
 
             try {
                 const payload = {
