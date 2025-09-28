@@ -13,7 +13,9 @@ from flask import Flask, Response, jsonify, request, send_from_directory, stream
 from llama_cpp import Llama, llama_chat_format
 from exa_search import exa_search
 
-DEFAULT_SYSTEM_PROMPT = "You are an assistant."
+DEFAULT_SYSTEM_PROMPT = (
+    "Your name is fih. You are a helpful assistant. Do not use emojis in any responses."
+)
 SMALL_MODEL_PATH = os.environ.get("SMALL_MODEL_PATH", "Llama-3.2-1B-Instruct-Q4_K_M.gguf")
 LARGE_MODEL_PATH = os.environ.get("LARGE_MODEL_PATH", "Qwen3-4B-Instruct-2507-Q4_K_M.gguf")
 DEFAULT_PPL_THRESHOLD = float(os.environ.get("PPL_THRESHOLD", "5.0"))
@@ -586,5 +588,5 @@ def health() -> "flask.Response":
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "5001"))
+    port = int(os.environ.get("PORT", "5002"))
     app.run(host="0.0.0.0", port=port, threaded=True)
