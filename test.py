@@ -1,3 +1,4 @@
+import gc
 import inspect
 import json
 import math
@@ -6,10 +7,11 @@ import platform
 import threading
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Iterator, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
 
 from flask import Flask, Response, jsonify, request, send_from_directory, stream_with_context
 from llama_cpp import Llama, llama_chat_format
+from exa_search import exa_search
 
 DEFAULT_SYSTEM_PROMPT = "You are an assistant."
 SMALL_MODEL_PATH = os.environ.get("SMALL_MODEL_PATH", "Llama-3.2-1B-Instruct-Q4_K_M.gguf")
@@ -18,7 +20,8 @@ DEFAULT_PPL_THRESHOLD = float(os.environ.get("PPL_THRESHOLD", "5.0"))
 MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "1024"))
 _CPU_COUNT = os.cpu_count() or 1
 DEFAULT_THREADS = int(os.environ.get("LLAMA_THREADS", str(max(_CPU_COUNT - 1, 1))))
-DEFAULT_BATCH_SIZE = int(os.environ.get("LLAMA_BATCH", "512"))
+DEFAULT_BATCH_SIZE = int(os.environ.get("LLAMA_BATCH", "1024"))
+DEFAULT_CONTEXT_SIZE = int(os.environ.get("LLAMA_CONTEXT_SIZE", "8192"))
 _CACHE_PROMPT_ENV = os.environ.get("LLAMA_CACHE_PROMPT")
 if _CACHE_PROMPT_ENV is None:
     DEFAULT_CACHE_PROMPT = platform.system().lower() != "darwin"
@@ -31,6 +34,7 @@ DEFAULT_N_GPU_LAYERS = int(os.environ.get(
 STOP_TOKENS = {"<|im_end|>", "</s>", "<|endoftext|>", "<|eot_id|>"}
 SMALL_CHAT_FORMAT = os.environ.get("SMALL_CHAT_FORMAT", "llama-3")
 LARGE_CHAT_FORMAT = os.environ.get("LARGE_CHAT_FORMAT", "qwen")
+MAX_SEARCH_RESULTS = 2
 
 CHAT_FORMATTERS = {
     "llama-3": llama_chat_format.format_llama3,
@@ -65,10 +69,13 @@ class GenerationContext:
     large_stop_tokens: Set[str]
     combined_stop_tokens: Set[str]
     perplexity_threshold: float
+    force_large: bool = False
 
 app = Flask(__name__)
 conversations: Dict[str, List[Dict[str, str]]] = {}
 generation_lock = threading.Lock()
+small_model_lock = threading.Lock()
+_small_model: Optional[Llama] = None
 
 
 def load_model(path: str, *, logits_all: bool = False) -> Llama:
@@ -78,10 +85,12 @@ def load_model(path: str, *, logits_all: bool = False) -> Llama:
     threads_env = os.environ.get("LLAMA_THREADS")
     batch_env = os.environ.get("LLAMA_BATCH")
     n_gpu_layers_env = os.environ.get("N_GPU_LAYERS")
+    context_env = os.environ.get("LLAMA_CONTEXT_SIZE")
 
     threads = int(threads_env) if threads_env else DEFAULT_THREADS
     n_batch = int(batch_env) if batch_env else DEFAULT_BATCH_SIZE
     n_gpu_layers = int(n_gpu_layers_env) if n_gpu_layers_env else DEFAULT_N_GPU_LAYERS
+    n_ctx = int(context_env) if context_env else DEFAULT_CONTEXT_SIZE
 
     kwargs = {
         "model_path": path,
@@ -89,6 +98,7 @@ def load_model(path: str, *, logits_all: bool = False) -> Llama:
         "logits_all": logits_all,
         "n_threads": threads,
         "n_batch": n_batch,
+        "n_ctx": n_ctx,
         "verbose": False,
     }
 
@@ -103,10 +113,24 @@ def load_model(path: str, *, logits_all: bool = False) -> Llama:
 
 
 try:
-    small_model = load_model(SMALL_MODEL_PATH, logits_all=True)
     large_model = load_model(LARGE_MODEL_PATH)
 except Exception as exc:  # pragma: no cover - startup failure is fatal
     raise RuntimeError(f"Failed to load models: {exc}") from exc
+
+
+def get_small_model() -> Llama:
+    global _small_model
+    with small_model_lock:
+        if _small_model is None:
+            _small_model = load_model(SMALL_MODEL_PATH, logits_all=True)
+        return _small_model
+
+
+def unload_small_model() -> None:
+    global _small_model
+    with small_model_lock:
+        _small_model = None
+        gc.collect()
 
 
 def get_next_token_and_logprob(
@@ -181,13 +205,19 @@ def _build_generation_context(
     history: List[Dict[str, str]],
     system_prompt: str,
     perplexity_threshold: Optional[float] = None,
+    *,
+    force_large: bool = False,
 ) -> GenerationContext:
     threshold = DEFAULT_PPL_THRESHOLD if perplexity_threshold is None else float(perplexity_threshold)
-    small_prompt_base, small_stop_tokens = build_model_prompt(
-        SMALL_CHAT_FORMATTER,
-        system_prompt,
-        history,
-    )
+    if force_large:
+        small_prompt_base = ""
+        small_stop_tokens: Set[str] = set()
+    else:
+        small_prompt_base, small_stop_tokens = build_model_prompt(
+            SMALL_CHAT_FORMATTER,
+            system_prompt,
+            history,
+        )
     large_prompt_base, large_stop_tokens = build_model_prompt(
         LARGE_CHAT_FORMATTER,
         system_prompt,
@@ -203,6 +233,7 @@ def _build_generation_context(
         large_stop_tokens=large_stop_tokens,
         combined_stop_tokens=combined_stop_tokens,
         perplexity_threshold=threshold,
+        force_large=force_large,
     )
 
 
@@ -212,17 +243,26 @@ def generate_token_with_fallback(
     small_stop_tokens: Set[str],
     large_stop_tokens: Set[str],
     threshold: float,
+    *,
+    force_large: bool,
 ) -> Tuple[str, Optional[str], bool]:
+    if force_large:
+        token, _, finish_reason = get_next_token_and_logprob(
+            large_model,
+            large_prompt,
+            large_stop_tokens,
+            need_logprob=False,
+        )
+        return token, finish_reason, True
+
+    small_llm = get_small_model()
     token, logprob, finish_reason = get_next_token_and_logprob(
-        small_model,
+        small_llm,
         small_prompt,
         small_stop_tokens,
         need_logprob=True,
     )
-    if logprob is None:
-        perplexity = float("inf")
-    else:
-        perplexity = perplexity_from_logprob(logprob)
+    perplexity = float("inf") if logprob is None else perplexity_from_logprob(logprob)
 
     if perplexity > threshold:
         token, _, finish_reason = get_next_token_and_logprob(
@@ -241,6 +281,76 @@ def clean_response_text(text: str, extra_stop_tokens: Optional[Set[str]] = None)
     for stop in all_stops:
         cleaned = cleaned.replace(stop, "")
     return cleaned.strip()
+
+
+def _field_from_object(obj: Any, field: str) -> Any:
+    if isinstance(obj, dict):
+        return obj.get(field)
+    return getattr(obj, field, None)
+
+
+def _coerce_str(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _normalize_whitespace(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _extract_search_results(raw: Any) -> List[Dict[str, str]]:
+    results: List[Dict[str, str]] = []
+    if raw is None:
+        return results
+
+    candidates: Any = None
+    if isinstance(raw, dict):
+        candidates = raw.get("results")
+    if candidates is None:
+        candidates = getattr(raw, "results", None)
+    if candidates is None:
+        return results
+
+    for item in list(candidates)[:MAX_SEARCH_RESULTS]:
+        title = _field_from_object(item, "title") or _field_from_object(item, "url") or "Untitled result"
+        url = _coerce_str(_field_from_object(item, "url"))
+        snippet_source = (
+            _field_from_object(item, "summary")
+            or _field_from_object(item, "text")
+            or _field_from_object(item, "snippet")
+        )
+        snippet = _normalize_whitespace(_coerce_str(snippet_source))
+        if len(snippet) > 500:
+            snippet = snippet[:497].rstrip() + "..."
+        results.append({
+            "title": _coerce_str(title) or "Untitled result",
+            "url": url,
+            "snippet": snippet,
+        })
+
+    return results
+
+
+def _build_search_context(results: List[Dict[str, str]]) -> str:
+    if not results:
+        return ""
+
+    lines = [
+        "The following web search results from Exa were retrieved to help answer the latest user request.",
+        "Use them when relevant and cite the URLs if they support the answer.",
+        "",
+    ]
+    for idx, item in enumerate(results, start=1):
+        title = item.get("title") or "Untitled result"
+        url = item.get("url") or ""
+        snippet = item.get("snippet") or ""
+        lines.append(f"{idx}. {title} - {url}".strip())
+        if snippet:
+            lines.append(f"Snippet: {snippet}")
+        lines.append("")
+
+    return "\n".join(lines).strip()
 
 
 def _partial_stop_length(text: str, stop: str) -> int:
@@ -266,8 +376,15 @@ def stream_response_tokens(
     system_prompt: str = DEFAULT_SYSTEM_PROMPT,
     context: Optional[GenerationContext] = None,
     perplexity_threshold: Optional[float] = None,
+    *,
+    force_large: bool = False,
 ) -> Iterator[Tuple[str, bool]]:
-    ctx = context or _build_generation_context(history, system_prompt, perplexity_threshold)
+    ctx = context or _build_generation_context(
+        history,
+        system_prompt,
+        perplexity_threshold,
+        force_large=force_large,
+    )
     raw_response = ""
     visible_response = ""
     pending_from_large = False
@@ -280,6 +397,7 @@ def stream_response_tokens(
             ctx.small_stop_tokens,
             ctx.large_stop_tokens,
             ctx.perplexity_threshold,
+            force_large=ctx.force_large,
         )
         if not token and finish_reason:
             break
@@ -321,14 +439,22 @@ def generate_response(
     history: List[Dict[str, str]],
     system_prompt: str = DEFAULT_SYSTEM_PROMPT,
     perplexity_threshold: Optional[float] = None,
+    *,
+    force_large: bool = False,
 ) -> str:
     response_parts = []
-    ctx = _build_generation_context(history, system_prompt, perplexity_threshold)
+    ctx = _build_generation_context(
+        history,
+        system_prompt,
+        perplexity_threshold,
+        force_large=force_large,
+    )
     for delta, _ in stream_response_tokens(
         history,
         system_prompt,
         context=ctx,
         perplexity_threshold=perplexity_threshold,
+        force_large=force_large,
     ):
         response_parts.append(delta)
     response = "".join(response_parts)
@@ -355,22 +481,65 @@ def chat() -> Response:
     def stream() -> Iterator[str]:
         history = conversations[conversation_id]
         buffered_response = ""
+        use_search = bool(data.get("use_search"))
+        search_results_payload: List[Dict[str, str]] = []
+        search_error: Optional[str] = None
+        search_context_text: Optional[str] = None
+
+        if use_search:
+            try:
+                raw_search = exa_search(message)
+                search_results_payload = _extract_search_results(raw_search)
+                search_context_text = _build_search_context(search_results_payload)
+            except Exception:  # pragma: no cover - network dependency
+                app.logger.exception("Exa search failed")
+                search_error = "Web search failed; continuing without external context."
+                search_results_payload = []
+                search_context_text = None
+
         try:
             with generation_lock:
-                history.append({"role": "user", "content": message})
+                augmented_message = message
+                if search_context_text:
+                    augmented_message = (
+                        f"{message}\n\n"
+                        "[Reference: Exa web search results]\n"
+                        f"{search_context_text}"
+                    )
+
+                history.append({"role": "user", "content": augmented_message})
                 threshold = data.get("perplexity_threshold")
                 if threshold is not None:
                     try:
                         threshold = float(threshold)
                     except (TypeError, ValueError):  # pragma: no cover - input validation fallback
                         threshold = None
-                ctx = _build_generation_context(history, DEFAULT_SYSTEM_PROMPT, threshold)
+                force_large = bool(data.get("always_use_large_model"))
+                if force_large:
+                    threshold = None
+                    unload_small_model()
+                ctx = _build_generation_context(
+                    history,
+                    DEFAULT_SYSTEM_PROMPT,
+                    threshold,
+                    force_large=force_large,
+                )
                 yield json.dumps({"conversation_id": conversation_id, "event": "start"}) + "\n"
+                if use_search:
+                    payload: Dict[str, Any] = {
+                        "conversation_id": conversation_id,
+                        "event": "search_results",
+                        "results": search_results_payload,
+                    }
+                    if search_error:
+                        payload["error"] = search_error
+                    yield json.dumps(payload) + "\n"
                 for delta, from_large in stream_response_tokens(
                     history,
                     DEFAULT_SYSTEM_PROMPT,
                     context=ctx,
                     perplexity_threshold=threshold,
+                    force_large=force_large,
                 ):
                     buffered_response += delta
                     yield json.dumps({
@@ -398,6 +567,7 @@ def chat() -> Response:
             "conversation_id": conversation_id,
             "done": True,
             "response": history[-1]["content"],
+            "from_large": force_large,
         }) + "\n"
 
     return Response(stream_with_context(stream()), mimetype="application/x-ndjson")
