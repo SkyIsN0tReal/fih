@@ -242,8 +242,17 @@
             font-size: 12px;
         }
 
-        :root[data-theme="dark"] .chat-message.assistant .large-token {
-            color: var(--red-text);
+        .chat-message.assistant .large-token {
+            color: inherit;
+            transition: color 0.2s ease;
+        }
+
+        body.developer-mode-active .chat-message.assistant .large-token {
+            color: #ff69b4;
+        }
+
+        :root[data-theme="dark"] body.developer-mode-active .chat-message.assistant .large-token {
+            color: #f48fb1;
         }
 
         .chat-message.user {
@@ -294,13 +303,13 @@
 
         .slider-row {
             display: flex;
-            align-items: center;
-            gap: 12px;
+            flex-direction: column;
+            gap: 8px;
             font-size: 12px;
             color: var(--text-secondary);
             background: var(--bg-primary);
             border-radius: 14px;
-            padding: 10px 14px;
+            padding: 12px 14px;
             border: 1px solid var(--border-subtle);
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.01);
         }
@@ -310,12 +319,23 @@
             pointer-events: none;
         }
 
+        .settings-menu .slider-row {
+            width: 100%;
+        }
+
+        .slider-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
         .slider-row label {
-            white-space: nowrap;
+            color: var(--text-primary);
         }
 
         .slider-row input[type="range"] {
-            flex: 1;
+            width: 100%;
             accent-color: var(--accent);
         }
 
@@ -328,6 +348,12 @@
             text-align: right;
             font-variant-numeric: tabular-nums;
             color: var(--text-primary);
+        }
+
+        .settings-divider {
+            height: 1px;
+            background: var(--border-subtle);
+            margin: 4px 0;
         }
 
         .toggle-btn {
@@ -433,25 +459,145 @@
             cursor: pointer;
         }
 
-        .clear-history-btn {
+        .settings-container {
             position: fixed;
             top: 20px;
             left: 20px;
-            border: none;
-            border-radius: 16px;
-            padding: 8px 14px;
-            font-size: 12px;
-            font-weight: 500;
-            background: var(--button-bg);
-            color: var(--text-primary);
-            cursor: pointer;
-            transition: background 0.2s ease, opacity 0.2s ease;
-            z-index: 1000;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            z-index: 1100;
+            padding-bottom: 18px;
         }
 
-        .clear-history-btn:hover {
+        .settings-button {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            background: var(--button-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: background 0.2s ease, transform 0.2s ease;
+            position: relative;
+        }
+
+        .settings-button:hover {
             background: var(--button-hover);
+            transform: rotate(-8deg);
+        }
+
+        .settings-icon {
+            width: 20px;
+            height: 20px;
+            color: var(--text-primary);
+            transition: transform 0.3s ease;
+        }
+
+        .settings-menu {
+            position: absolute;
+            top: 48px;
+            left: 0;
+            min-width: 190px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 10px;
+            opacity: 0;
+            transform: translateY(8px);
+            pointer-events: none;
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+
+        .settings-container.open .settings-menu {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .settings-container.closing .settings-menu {
+            opacity: 0;
+            transform: translateY(-6px);
+            pointer-events: none;
+        }
+
+        .settings-menu-item {
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 500;
+            text-align: left;
+            padding: 8px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .settings-menu-item:hover {
+            background: var(--button-hover);
+        }
+
+        .settings-menu-item.active {
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+
+        .settings-menu::before {
+            content: '';
+            position: absolute;
+            top: -14px;
+            left: 0;
+            right: 0;
+            height: 14px;
+            background: transparent;
+        }
+
+        .chat-message.assistant p,
+        .chat-message.assistant ul,
+        .chat-message.assistant ol,
+        .chat-message.assistant pre {
+            margin: 0 0 8px;
+        }
+
+        .chat-message.assistant p:last-child,
+        .chat-message.assistant ul:last-child,
+        .chat-message.assistant ol:last-child,
+        .chat-message.assistant pre:last-child {
+            margin-bottom: 0;
+        }
+
+        .chat-message.assistant ul,
+        .chat-message.assistant ol {
+            padding-left: 20px;
+        }
+
+        .chat-message.assistant li {
+            margin: 4px 0;
+        }
+
+        .chat-message.assistant code {
+            font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+            background: rgba(148, 163, 184, 0.15);
+            border-radius: 4px;
+            padding: 2px 4px;
+            font-size: 12px;
+        }
+
+        .chat-message.assistant pre {
+            background: rgba(148, 163, 184, 0.12);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .chat-message.assistant pre code {
+            background: transparent;
+            padding: 0;
         }
 
         .chat-send-btn.is-stop {
@@ -466,96 +612,11 @@
         }
 
 
-        .thinking-indicator {
-            color: var(--text-muted);
-            font-size: 13px;
-            line-height: 1.4;
-            margin-bottom: 12px;
-            margin-top: auto;
-            display: none;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            padding-bottom: 8px;
-        }
-
-        .thinking-indicator.show {
-            display: block;
-            opacity: 1;
-        }
-
-        .thinking-content {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            white-space: nowrap;
-        }
-
-        .fade-text {
-            display: inline-flex;
-            gap: 0;
-            letter-spacing: 0;
-            font-size: 13px;
-            line-height: 1.4;
-            color: var(--text-muted);
-        }
-
-        .fade-text span {
-            display: inline-block;
-            margin: 0;
-            opacity: 0;
-            animation: fadeOnly 1.5s ease-in-out infinite;
-        }
-
-        .fade-text span:nth-child(1) { animation-delay: 0s; }
-        .fade-text span:nth-child(2) { animation-delay: 0.05s; }
-        .fade-text span:nth-child(3) { animation-delay: 0.1s; }
-        .fade-text span:nth-child(4) { animation-delay: 0.15s; }
-        .fade-text span:nth-child(5) { animation-delay: 0.2s; }
-        .fade-text span:nth-child(6) { animation-delay: 0.25s; }
-        .fade-text span:nth-child(7) { animation-delay: 0.3s; }
-        .fade-text span:nth-child(8) { animation-delay: 0.35s; }
-        .fade-text span:nth-child(9) { animation-delay: 0.4s; }
-        .fade-text span:nth-child(10) { animation-delay: 0.45s; }
-        .fade-text span:nth-child(11) { animation-delay: 0.5s; }
-
-        @keyframes fadeOnly {
-            0% { opacity: 0; }
-            30% { opacity: 1; }
-            70% { opacity: 1; }
-            100% { opacity: 0; }
-        }
-
-
-
         /* Send icon placeholder */
         .send-icon {
             width: 14px;
             height: 14px;
             color: var(--send-icon-color);
-        }
-
-        /* Theme toggle button */
-        .theme-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            width: 40px;
-            height: 40px;
-            border: none;
-            background: var(--button-bg);
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.3s ease, transform 0.2s ease;
-            z-index: 1000;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .theme-toggle:hover {
-            background: var(--button-hover);
-            transform: scale(1.05);
         }
 
         .theme-icon {
@@ -576,6 +637,13 @@
             display: none;
         }
 
+        .settings-menu-item.theme-toggle-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
         /* Ensure send icon changes color in light mode */
         :root[data-theme="light"] .send-icon {
             filter: brightness(0) saturate(100%) invert(100%);
@@ -588,24 +656,45 @@
     </style>
 </head>
 <body>
-    <button id="clearHistoryBtn" class="clear-history-btn" type="button">Clear history</button>
-    <!-- Theme Toggle Button -->
-    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
-        <svg class="theme-icon sun-icon" id="sunIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
-        <svg class="theme-icon moon-icon hidden" id="moonIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
-    </button>
+    <div id="settingsContainer" class="settings-container" aria-expanded="false">
+        <button id="settingsButton" class="settings-button" type="button" aria-haspopup="true" aria-expanded="false">
+            <svg class="settings-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+        </button>
+        <div id="settingsMenu" class="settings-menu" role="menu" aria-hidden="true">
+            <div class="slider-row" role="group" aria-labelledby="perplexityLabel">
+                <div class="slider-header">
+                    <label id="perplexityLabel" for="perplexitySlider">Perplexity threshold</label>
+                    <span id="perplexityValue" class="slider-value">5.0</span>
+                </div>
+                <input id="perplexitySlider" type="range" min="1" max="20" step="0.5" value="5">
+            </div>
+            <button id="themeToggleButton" class="settings-menu-item theme-toggle-item" type="button" data-action="toggle-theme" role="menuitem" aria-pressed="false">
+                <span id="themeToggleLabel">Light mode off</span>
+                <svg class="theme-icon sun-icon" id="sunIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+                <svg class="theme-icon moon-icon hidden" id="moonIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </button>
+            <div class="settings-divider" role="presentation"></div>
+            <button class="settings-menu-item" type="button" data-action="clear-history" role="menuitem">Clear history</button>
+            <button class="settings-menu-item" type="button" data-action="toggle-search" role="menuitem">Web search off</button>
+            <button class="settings-menu-item" type="button" data-action="toggle-large" role="menuitem">Always use qwen3 4b off</button>
+            <button class="settings-menu-item" type="button" data-action="toggle-developer" role="menuitem">Developer mode on</button>
+        </div>
+    </div>
     <div id="sidebar">
         <div class="sidebar-layout">
             <div class="sidebar-content">
@@ -614,24 +703,10 @@
                 </div>
                 <div id="chatMessagesWrapper" class="chat-messages-wrapper">
                     <div id="chatMessages" class="chat-messages"></div>
-                    <div class="thinking-indicator" id="thinkingIndicator">
-                        <div class="thinking-content">
-                            <div class="fade-text" id="thinkingText">
-                                <span>T</span><span>h</span><span>i</span><span>n</span><span>k</span><span>i</span><span>n</span><span>g</span><span>.</span><span>.</span><span>.</span>
-                            </div>
-                        </div>
-                    </div>
                     <div id="chatBottomSpacer" class="chat-bottom-spacer" aria-hidden="true"></div>
                 </div>
             </div>
             <div class="sidebar-footer">
-                <div class="slider-row">
-                    <label for="perplexitySlider">Perplexity threshold</label>
-                    <input id="perplexitySlider" type="range" min="1" max="20" step="0.5" value="5">
-                    <span id="perplexityValue" class="slider-value">5.0</span>
-                </div>
-                <button id="searchToggleBtn" class="toggle-btn" type="button" aria-pressed="false">Web search off</button>
-                <button id="forceLargeBtn" class="toggle-btn" type="button" aria-pressed="false">Always use qwen3 4b</button>
                 <div class="chat-input-row" id="chatInputRow">
                     <textarea id="chatInput" class="chat-input" placeholder="Ask fih..." rows="1"></textarea>
                     <button id="chatSendBtn" class="chat-send-btn">
@@ -642,11 +717,13 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"></script>
     <script>
         // Theme Toggle Functionality
-        const themeToggle = document.getElementById('themeToggle');
         const sunIcon = document.getElementById('sunIcon');
         const moonIcon = document.getElementById('moonIcon');
+        const themeToggleLabel = document.getElementById('themeToggleLabel');
         const root = document.documentElement;
 
         // Check for saved theme preference or default to dark mode
@@ -655,23 +732,19 @@
         updateThemeIcon(currentTheme);
 
         function updateThemeIcon(theme) {
-            if (theme === 'light') {
-                sunIcon.classList.add('hidden');
-                moonIcon.classList.remove('hidden');
-            } else {
-                sunIcon.classList.remove('hidden');
-                moonIcon.classList.add('hidden');
+            if (sunIcon && moonIcon) {
+                if (theme === 'light') {
+                    sunIcon.classList.add('hidden');
+                    moonIcon.classList.remove('hidden');
+                } else {
+                    sunIcon.classList.remove('hidden');
+                    moonIcon.classList.add('hidden');
+                }
+            }
+            if (themeToggleLabel) {
+                themeToggleLabel.textContent = theme === 'light' ? 'Light mode on' : 'Light mode off';
             }
         }
-
-        themeToggle.addEventListener('click', () => {
-            const currentTheme = root.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-
-            root.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            updateThemeIcon(newTheme);
-        });
 
         // Chat functionality
         const chatInput = document.getElementById('chatInput');
@@ -682,19 +755,22 @@
         const welcomeContainer = document.getElementById('welcomeContainer');
         const thinkingIndicator = document.getElementById('thinkingIndicator');
         const chatInputRow = document.getElementById('chatInputRow');
-        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+        const settingsContainer = document.getElementById('settingsContainer');
+        const settingsButton = document.getElementById('settingsButton');
+        const settingsMenu = document.getElementById('settingsMenu');
         const perplexitySlider = document.getElementById('perplexitySlider');
         const perplexityValue = document.getElementById('perplexityValue');
-        const forceLargeBtn = document.getElementById('forceLargeBtn');
-        const searchToggleBtn = document.getElementById('searchToggleBtn');
         const sliderRow = document.querySelector('.slider-row');
         const SEND_ICON_SVG = '<svg class="send-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M13.0001 7.82843V20H11.0001V7.82843L5.63614 13.1924L4.22192 11.7782L12.0001 4L19.7783 11.7782L18.3641 13.1924L13.0001 7.82843Z"></path></svg>';
         const STOP_ICON_SVG = '<svg class="send-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"></rect></svg>';
         const ALWAYS_USE_LARGE_KEY = 'alwaysUseLargeModel';
         const USE_SEARCH_KEY = 'useSearchEnabled';
+        const DEVELOPER_MODE_KEY = 'developerModeEnabled';
         const BOTTOM_BUFFER_PX = 320;
         const TOP_ANCHOR_OFFSET_PX = 24;
         const NEAR_BOTTOM_THRESHOLD_PX = 120;
+        const LARGE_MARKER_START = '[[LG_START]]';
+        const LARGE_MARKER_END = '[[LG_END]]';
 
         let isGeneratingResponse = false;
         let conversationId = localStorage.getItem('conversationId');
@@ -703,6 +779,166 @@
         let hasReceivedFirstChunk = false;
         let alwaysUseLargeModel = localStorage.getItem(ALWAYS_USE_LARGE_KEY) === 'true';
         let useSearch = localStorage.getItem(USE_SEARCH_KEY) === 'true';
+        const settingsMenuElements = settingsMenu ? {
+            theme: settingsMenu.querySelector('[data-action="toggle-theme"]'),
+            clear: settingsMenu.querySelector('[data-action="clear-history"]'),
+            search: settingsMenu.querySelector('[data-action="toggle-search"]'),
+            large: settingsMenu.querySelector('[data-action="toggle-large"]'),
+            developer: settingsMenu.querySelector('[data-action="toggle-developer"]'),
+        } : {};
+        const storedDeveloperMode = localStorage.getItem(DEVELOPER_MODE_KEY);
+        let developerModeEnabled = storedDeveloperMode === null ? true : storedDeveloperMode === 'true';
+        document.body.classList.toggle('developer-mode-active', developerModeEnabled);
+
+        let settingsCloseTimer = null;
+
+        function updateAlwaysUseLargeUI() {
+            if (perplexitySlider) {
+                perplexitySlider.disabled = alwaysUseLargeModel;
+            }
+            if (sliderRow) {
+                sliderRow.classList.toggle('disabled', alwaysUseLargeModel);
+            }
+            const item = settingsMenuElements.large;
+            if (item) {
+                item.textContent = alwaysUseLargeModel ? 'Always use qwen3 4b on' : 'Always use qwen3 4b off';
+                item.classList.toggle('active', alwaysUseLargeModel);
+                item.setAttribute('aria-pressed', alwaysUseLargeModel ? 'true' : 'false');
+            }
+        }
+
+        function updateSearchMenuItem() {
+            const item = settingsMenuElements.search;
+            if (!item) return;
+            item.textContent = useSearch ? 'Web search on' : 'Web search off';
+            item.classList.toggle('active', useSearch);
+            item.setAttribute('aria-pressed', useSearch ? 'true' : 'false');
+        }
+
+        function updateDeveloperModeUI() {
+            document.body.classList.toggle('developer-mode-active', developerModeEnabled);
+            const item = settingsMenuElements.developer;
+            if (item) {
+                item.textContent = developerModeEnabled ? 'Developer mode on' : 'Developer mode off';
+                item.classList.toggle('active', developerModeEnabled);
+                item.setAttribute('aria-pressed', developerModeEnabled ? 'true' : 'false');
+            }
+        }
+
+        function updateThemeMenuItem() {
+            const item = settingsMenuElements.theme;
+            if (!item) return;
+            const theme = root.getAttribute('data-theme') || 'dark';
+            const isLight = theme === 'light';
+            item.classList.toggle('active', isLight);
+            item.setAttribute('aria-pressed', isLight ? 'true' : 'false');
+        }
+
+        function updateSettingsMenuStates() {
+            updateAlwaysUseLargeUI();
+            updateSearchMenuItem();
+            updateThemeMenuItem();
+            updateDeveloperModeUI();
+        }
+
+        function openSettingsMenu() {
+            if (!settingsContainer) return;
+            clearTimeout(settingsCloseTimer);
+            settingsContainer.classList.add('open');
+            settingsContainer.classList.remove('closing');
+            settingsContainer.setAttribute('aria-expanded', 'true');
+            if (settingsButton) {
+                settingsButton.setAttribute('aria-expanded', 'true');
+            }
+            if (settingsMenu) {
+                settingsMenu.setAttribute('aria-hidden', 'false');
+            }
+        }
+
+        function closeSettingsMenu(immediate = false) {
+            if (!settingsContainer) return;
+            if (immediate) {
+                settingsContainer.classList.remove('open', 'closing');
+                settingsContainer.setAttribute('aria-expanded', 'false');
+                if (settingsButton) {
+                    settingsButton.setAttribute('aria-expanded', 'false');
+                }
+                if (settingsMenu) {
+                    settingsMenu.setAttribute('aria-hidden', 'true');
+                }
+                return;
+            }
+
+            settingsContainer.classList.remove('open');
+            settingsContainer.classList.add('closing');
+            settingsContainer.setAttribute('aria-expanded', 'false');
+            if (settingsButton) {
+                settingsButton.setAttribute('aria-expanded', 'false');
+            }
+            if (settingsMenu) {
+                settingsMenu.setAttribute('aria-hidden', 'true');
+            }
+            clearTimeout(settingsCloseTimer);
+            settingsCloseTimer = window.setTimeout(() => {
+                settingsContainer.classList.remove('closing');
+            }, 180);
+        }
+
+        async function clearHistory() {
+            if (isGeneratingResponse && activeController) {
+                abortRequested = true;
+                activeController.abort();
+            }
+
+            const previousConversation = conversationId;
+            conversationId = null;
+            localStorage.removeItem('conversationId');
+
+            chatMessages.innerHTML = '';
+            if (chatMessagesWrapper) {
+                chatMessagesWrapper.scrollTop = 0;
+            }
+            if (welcomeContainer) {
+                welcomeContainer.classList.remove('hidden');
+            }
+
+            hideThinking();
+            updateBottomSpacer();
+
+            if (previousConversation) {
+                try {
+                    const endpoint = `/api/conversations/${encodeURIComponent(previousConversation)}`;
+                    await fetch(endpoint, { method: 'DELETE' });
+                } catch (err) {
+                    console.warn('Failed to clear conversation', err);
+                }
+            }
+        }
+
+        function renderAssistantMessageWithFormatting(element) {
+            if (!element) return;
+            const renderSource = element.dataset.renderText || element.dataset.rawText || '';
+            if (!renderSource) {
+                element.textContent = '';
+                return;
+            }
+
+            if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+                const fallback = renderSource
+                    .replaceAll(LARGE_MARKER_START, '')
+                    .replaceAll(LARGE_MARKER_END, '')
+                    .replaceAll('\n', '<br>');
+                element.innerHTML = fallback;
+                return;
+            }
+
+            const parsed = marked.parse(renderSource, { breaks: true, gfm: true });
+            const withHighlights = parsed
+                .replaceAll(LARGE_MARKER_START, '<span class="large-token">')
+                .replaceAll(LARGE_MARKER_END, '</span>');
+            const sanitized = DOMPurify.sanitize(withHighlights, { USE_PROFILES: { html: true } });
+            element.innerHTML = sanitized;
+        }
 
         function getBottomSpacerHeight() {
             return bottomSpacer ? bottomSpacer.offsetHeight : 0;
@@ -769,50 +1005,87 @@
             });
         }
 
-        function updateForceLargeButton() {
-            if (!forceLargeBtn) return;
-            if (alwaysUseLargeModel) {
-                forceLargeBtn.classList.add('active');
-            } else {
-                forceLargeBtn.classList.remove('active');
+        updateSettingsMenuStates();
+
+        function handleSettingsAction(action) {
+            switch (action) {
+                case 'clear-history':
+                    clearHistory().catch((err) => {
+                        console.warn('Failed to clear history', err);
+                    });
+                    break;
+                case 'toggle-search':
+                    useSearch = !useSearch;
+                    localStorage.setItem(USE_SEARCH_KEY, String(useSearch));
+                    updateSearchMenuItem();
+                    break;
+                case 'toggle-theme': {
+                    const current = root.getAttribute('data-theme');
+                    const newTheme = current === 'dark' ? 'light' : 'dark';
+                    root.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('theme', newTheme);
+                    updateThemeIcon(newTheme);
+                    updateThemeMenuItem();
+                    break;
+                }
+                case 'toggle-large':
+                    alwaysUseLargeModel = !alwaysUseLargeModel;
+                    localStorage.setItem(ALWAYS_USE_LARGE_KEY, String(alwaysUseLargeModel));
+                    updateAlwaysUseLargeUI();
+                    break;
+                case 'toggle-developer':
+                    developerModeEnabled = !developerModeEnabled;
+                    localStorage.setItem(DEVELOPER_MODE_KEY, String(developerModeEnabled));
+                    updateDeveloperModeUI();
+                    break;
+                default:
+                    break;
             }
-            forceLargeBtn.setAttribute('aria-pressed', alwaysUseLargeModel ? 'true' : 'false');
-            if (perplexitySlider) {
-                perplexitySlider.disabled = alwaysUseLargeModel;
-            }
-            if (sliderRow) {
-                sliderRow.classList.toggle('disabled', alwaysUseLargeModel);
-            }
+            closeSettingsMenu();
         }
 
-        function updateSearchToggleButton() {
-            if (!searchToggleBtn) return;
-            if (useSearch) {
-                searchToggleBtn.classList.add('active');
-                searchToggleBtn.textContent = 'Web search on';
-            } else {
-                searchToggleBtn.classList.remove('active');
-                searchToggleBtn.textContent = 'Web search off';
-            }
-            searchToggleBtn.setAttribute('aria-pressed', useSearch ? 'true' : 'false');
-        }
-
-        updateForceLargeButton();
-        updateSearchToggleButton();
-
-        if (forceLargeBtn) {
-            forceLargeBtn.addEventListener('click', () => {
-                alwaysUseLargeModel = !alwaysUseLargeModel;
-                localStorage.setItem(ALWAYS_USE_LARGE_KEY, String(alwaysUseLargeModel));
-                updateForceLargeButton();
+        if (settingsContainer) {
+            settingsContainer.addEventListener('mouseenter', openSettingsMenu);
+            settingsContainer.addEventListener('mouseleave', () => closeSettingsMenu());
+            settingsContainer.addEventListener('focusin', openSettingsMenu);
+            settingsContainer.addEventListener('focusout', (event) => {
+                if (!settingsContainer.contains(event.relatedTarget)) {
+                    closeSettingsMenu();
+                }
             });
         }
 
-        if (searchToggleBtn) {
-            searchToggleBtn.addEventListener('click', () => {
-                useSearch = !useSearch;
-                localStorage.setItem(USE_SEARCH_KEY, String(useSearch));
-                updateSearchToggleButton();
+        if (settingsMenu) {
+            settingsMenu.addEventListener('click', (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) return;
+                const action = target.dataset.action;
+                if (!action) return;
+                handleSettingsAction(action);
+            });
+            settingsMenu.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    closeSettingsMenu();
+                    settingsButton?.focus();
+                }
+            });
+        }
+
+        if (settingsButton) {
+            settingsButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                const isOpen = settingsContainer?.classList.contains('open');
+                if (isOpen) {
+                    closeSettingsMenu();
+                } else {
+                    openSettingsMenu();
+                }
+            });
+            settingsButton.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    closeSettingsMenu();
+                    settingsButton.blur();
+                }
             });
         }
 
@@ -940,6 +1213,7 @@
             assistantMessage.className = 'chat-message assistant';
             assistantMessage.textContent = '';
             assistantMessage.dataset.rawText = '';
+            assistantMessage.dataset.renderText = '';
             chatMessages.appendChild(assistantMessage);
             scrollToLatest({ element: assistantMessage, force: true, smooth: true });
 
@@ -1021,15 +1295,11 @@
                     hasReceivedFirstChunk = true;
                     hideThinking();
                 }
-                assistantMessage.dataset.rawText = (assistantMessage.dataset.rawText || '') + chunk;
-                if (fromLarge) {
-                    const span = document.createElement('span');
-                    span.className = 'large-token';
-                    span.textContent = chunk;
-                    assistantMessage.appendChild(span);
-                } else {
-                    assistantMessage.appendChild(document.createTextNode(chunk));
-                }
+                const currentRaw = assistantMessage.dataset.rawText || '';
+                const currentRender = assistantMessage.dataset.renderText || '';
+                assistantMessage.dataset.rawText = currentRaw + chunk;
+                assistantMessage.dataset.renderText = currentRender + (fromLarge ? `${LARGE_MARKER_START}${chunk}${LARGE_MARKER_END}` : chunk);
+                renderAssistantMessageWithFormatting(assistantMessage);
                 scrollToLatest({ element: assistantMessage, smooth: true, force: false });
             };
 
@@ -1104,9 +1374,13 @@
                         }
 
                         if (payload.done) {
-                            if (payload.response) {
+                            if (typeof payload.response === 'string' && payload.response.length) {
                                 assistantMessage.dataset.rawText = payload.response;
+                                if (!assistantMessage.dataset.renderText) {
+                                    assistantMessage.dataset.renderText = payload.response;
+                                }
                             }
+                            renderAssistantMessageWithFormatting(assistantMessage);
                             done = true;
                             break;
                         }
@@ -1129,9 +1403,13 @@
                             appendAssistantChunk(payload.delta, Boolean(payload.from_large));
                         }
                         if (payload.done) {
-                            if (payload.response) {
+                            if (typeof payload.response === 'string' && payload.response.length) {
                                 assistantMessage.dataset.rawText = payload.response;
+                                if (!assistantMessage.dataset.renderText) {
+                                    assistantMessage.dataset.renderText = payload.response;
+                                }
                             }
+                            renderAssistantMessageWithFormatting(assistantMessage);
                         }
                     } catch (parseError) {
                         console.error('Failed to parse trailing stream chunk', parseError, buffer);
@@ -1144,6 +1422,7 @@
                     console.error('Chat error', error);
                     assistantMessage.textContent = `Sorry, something went wrong: ${error.message}`;
                     assistantMessage.dataset.rawText = assistantMessage.textContent;
+                    assistantMessage.dataset.renderText = assistantMessage.dataset.rawText;
                 }
             } finally {
                 if (reader) {
@@ -1154,6 +1433,7 @@
                 activeController = null;
                 abortRequested = false;
                 hasReceivedFirstChunk = false;
+                renderAssistantMessageWithFormatting(assistantMessage);
                 scrollToLatest({ element: assistantMessage, force: true, smooth: true });
             }
         }
@@ -1204,40 +1484,6 @@
                 welcomeContainer.classList.add('hidden');
             }
         }
-
-        if (clearHistoryBtn) {
-            clearHistoryBtn.addEventListener('click', async () => {
-                if (isGeneratingResponse && activeController) {
-                    abortRequested = true;
-                    activeController.abort();
-                }
-
-                const previousConversation = conversationId;
-                conversationId = null;
-                localStorage.removeItem('conversationId');
-
-                chatMessages.innerHTML = '';
-                if (chatMessagesWrapper) {
-                    chatMessagesWrapper.scrollTop = 0;
-                }
-                if (welcomeContainer) {
-                    welcomeContainer.classList.remove('hidden');
-                }
-
-                hideThinking();
-                updateBottomSpacer();
-
-                if (previousConversation) {
-                    try {
-                        const endpoint = `/api/conversations/${encodeURIComponent(previousConversation)}`;
-                        await fetch(endpoint, { method: 'DELETE' });
-                    } catch (err) {
-                        console.warn('Failed to clear conversation', err);
-                    }
-                }
-            });
-        }
-
         setGeneratingState(false);
         updateBottomSpacer();
 
